@@ -1,10 +1,9 @@
 extensions [ gis ]
 globals [ roads-dataset ]
 breed [ nodes node ]
-;breed [ scooters scooter ]
-breed [ walkers walker ]
-walkers-own [ destination ]
-;scooters-own [slocation]
+breed [ pedestrians pedestrian ]
+pedestrians-own [ destination ]
+
 
 to setup
   ; reset
@@ -59,7 +58,7 @@ to make-road-network
 end
 
 to add-agents
-  create-walkers 50 [
+  create-pedestrians 50 [
     set color red
     ; random spawn location
     let feature one-of gis:feature-list-of roads-dataset
@@ -68,7 +67,7 @@ to add-agents
     ; set spawn position
     set xcor item 0 location
     set ycor item 1 location
-    ;;radius for selection of node
+    ;;radius for selection of destination
     let nearest-node min-one-of (nodes in-radius 25)[distance myself]
     set destination nearest-node
     move-to destination
@@ -76,16 +75,11 @@ to add-agents
 end
 
 to go
-  ask walkers [
+  ask pedestrians [
     let new-location one-of [link-neighbors] of destination
     move-to new-location
     set destination new-location
   ]
-  ;ask scooters [
-  ;  let new-location one-of [link-neighbors] of slocation
-  ;  move-to new-location
-  ;  set slocation new-location
-  ;]
   tick
 end
 
