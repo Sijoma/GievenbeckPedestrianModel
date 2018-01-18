@@ -3,7 +3,7 @@ globals [ roads-dataset ]
 breed [ nodes node ]
 ;breed [ scooters scooter ]
 breed [ walkers walker ]
-walkers-own [ wlocation ]
+walkers-own [ destination ]
 ;scooters-own [slocation]
 
 to setup
@@ -12,15 +12,15 @@ to setup
   reset-ticks
 
   ; load data set
-  gis:load-coordinate-system (word "/home/simon/Documents/NetlogoModels/data/gis.osm_railways_free_1.prj")
-  set roads-dataset gis:load-dataset "/home/simon/Documents/NetlogoModels/data/gis.osm_railways_free_1.shp"
-  ;set scooter-dataset gis:load-dataset "C:/shape/scooter.shp"
+  gis:load-coordinate-system (word "/home/simon/Documents/NetlogoModels/data/edges.prj")
+  set roads-dataset gis:load-dataset "/home/simon/Documents/NetlogoModels/data/edges.shp"
+
   gis:set-world-envelope (gis:envelope-of roads-dataset)
 
   ; draw data set
   gis:set-drawing-color blue
   gis:draw roads-dataset 1
-
+  set-default-shape nodes "circle"
   make-road-network
   add-agents
 end
@@ -35,8 +35,9 @@ to make-road-network
         let location gis:location-of ?
         if not empty? location [ ; some coordinates are empty []
           create-nodes 1 [
+
             set color green
-            set size 1
+            set size 0.25
             set xcor item 0 location
             set ycor item 1 location
             set hidden? true
@@ -58,37 +59,27 @@ to make-road-network
 end
 
 to add-agents
-  create-walkers 5 [
+  create-walkers 50 [
     set color red
-    set wlocation one-of nodes
-    move-to wlocation
+    ; random spawn location
+    let feature one-of gis:feature-list-of roads-dataset
+    let vertex one-of gis:vertex-lists-of feature
+    let location gis:location-of (first vertex)
+    ; set spawn position
+    set xcor item 0 location
+    set ycor item 1 location
+    ;;radius for selection of node
+    let nearest-node min-one-of (nodes in-radius 25)[distance myself]
+    set destination nearest-node
+    move-to destination
   ]
 end
 
-;;;to add-scooters
-;  foreach gis:feature-list-of scooter-dataset [
-;    foreach gis:vertex-lists-of ? [
-;      let location gis:location-of (first ?)
-;
-;      create-scooters 1 [
-;        set color yellow
-;        set size 1
-;        set xcor item 0 location
-;        set ycor item 1 location
-;
-;        let nearest-node min-one-of (nodes in-radius 10)[distance myself]
-;        set slocation nearest-node
-;        move-to slocation
-;      ]
-;    ]
-;  ]
-;end;;;
-
 to go
   ask walkers [
-    let new-location one-of [link-neighbors] of wlocation
+    let new-location one-of [link-neighbors] of destination
     move-to new-location
-    set wlocation new-location
+    set destination new-location
   ]
   ;ask scooters [
   ;  let new-location one-of [link-neighbors] of slocation
@@ -96,6 +87,14 @@ to go
   ;  set slocation new-location
   ;]
   tick
+end
+
+to show-nodes
+  ask nodes [ set hidden? false ]
+end
+
+to hide-nodes
+  ask nodes [ set hidden? true ]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -126,10 +125,10 @@ ticks
 30.0
 
 BUTTON
-6
-33
-69
-66
+94
+25
+166
+68
 NIL
 go
 T
@@ -143,12 +142,56 @@ NIL
 0
 
 BUTTON
-98
-20
-171
-53
+13
+26
+84
+66
 NIL
 setup
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+214
+502
+280
+535
+Show
+show-nodes
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+TEXTBOX
+214
+481
+364
+499
+Nodes
+12
+0.0
+1
+
+BUTTON
+215
+549
+279
+582
+Hide
+hide-nodes
 NIL
 1
 T
