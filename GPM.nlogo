@@ -12,8 +12,8 @@ to setup
   reset-ticks
 
   ; load data set
-  gis:load-coordinate-system (word "data/street_network.prj")
-  set roads-dataset gis:load-dataset "data/street_network.shp"
+  gis:load-coordinate-system (word "street_network.prj")
+  set roads-dataset gis:load-dataset "street_network.shp"
 
   gis:set-world-envelope (gis:envelope-of roads-dataset)
 
