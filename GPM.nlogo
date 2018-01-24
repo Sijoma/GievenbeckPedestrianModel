@@ -1,6 +1,7 @@
-extensions [ gis ]
-globals [ roads-dataset ]
+extensions [ gis nw ]
+globals [ roads-dataset patchSize]
 breed [ nodes node ]
+breed [ edges edge ]
 breed [ pedestrians pedestrian ]
 pedestrians-own [ destination ]
 
@@ -11,8 +12,8 @@ to setup
   reset-ticks
 
   ; load data set
-  gis:load-coordinate-system (word "/home/simon/Documents/NetlogoModels/data/edges.prj")
-  set roads-dataset gis:load-dataset "/home/simon/Documents/NetlogoModels/data/edges.shp"
+  gis:load-coordinate-system (word "data/street_network.prj")
+  set roads-dataset gis:load-dataset "data/street_network.shp"
 
   gis:set-world-envelope (gis:envelope-of roads-dataset)
 
@@ -20,8 +21,19 @@ to setup
   gis:set-drawing-color blue
   gis:draw roads-dataset 1
   set-default-shape nodes "circle"
+
+  set patchSize gis-patch-size
+
   make-road-network
   add-agents
+
+  ;; show path and destination and current positon
+  ask node 4 [ show nw:path-to node 25]
+  ask node 4 [ set color white ]
+  ask node 25 [ set color red ]
+  ask node 4 [   set size 1.55 ]
+  ask node 25 [  set size 1.55 ]
+
 end
 
 to make-road-network
@@ -29,22 +41,29 @@ to make-road-network
   let first-node nobody
   let previous-node nobody
   foreach gis:feature-list-of roads-dataset [ ; each polyline
+    ;; get attraction of street segment
+    let attraction gis:property-value ? "ATTRACT"
     foreach gis:vertex-lists-of ? [ ; each polyline segment / coordinate pair
       foreach ? [ ; each coordinate
         let location gis:location-of ?
         if not empty? location [ ; some coordinates are empty []
           create-nodes 1 [
-
+            ;; all nodes have the attraction of the street segment they are on
+            let attractionNode attraction
             set color green
             set size 0.25
             set xcor item 0 location
             set ycor item 1 location
             set hidden? true
+            let weight 0
+
             if first-node = nobody [
               set first-node self
             ]
             if previous-node != nobody [
-              create-link-with previous-node
+              ;let distanz distance previous-node
+              create-link-with previous-node [ set weight 1]
+
             ]
             set previous-node self
           ]
@@ -58,17 +77,23 @@ to make-road-network
 end
 
 to add-agents
-  create-pedestrians 50 [
+  create-pedestrians 5 [
     set color red
     ; random spawn location
     let feature one-of gis:feature-list-of roads-dataset
+
     let vertex one-of gis:vertex-lists-of feature
     let location gis:location-of (first vertex)
     ; set spawn position
     set xcor item 0 location
     set ycor item 1 location
     ;;radius for selection of destination
-    let nearest-node min-one-of (nodes in-radius 25)[distance myself]
+    let nearest-node min-one-of (nodes in-radius 1)[distance myself]
+    ;; node has attraction, select random node with attraction higher 0.5
+    ;;let destination min-one-of (nodes in-radius 30)[distance myself]
+    ;; path is the array with the links that connect the agents node to the destination
+    ;;set path ask node nearest-node [show nw:path-to node destination]
+    ;; implement function that iterates over the array and calls move to on the next link
     set destination nearest-node
     move-to destination
   ]
@@ -81,6 +106,11 @@ to go
     set destination new-location
   ]
   tick
+end
+
+to-report gis-patch-size ;; note: assume width & height same
+  let world gis:world-envelope
+  report (item 1 world - item 0 world) / (max-pxcor - min-pxcor)
 end
 
 to show-nodes
@@ -195,6 +225,17 @@ NIL
 NIL
 NIL
 1
+
+MONITOR
+53
+386
+120
+431
+NIL
+patchSiz
+17
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
