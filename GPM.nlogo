@@ -1,5 +1,5 @@
 extensions [ gis nw ]
-globals [ roads-dataset patchSize]
+globals [ roads-dataset ]
 breed [ nodes node ]
 breed [ edges edge ]
 breed [ pedestrians pedestrian ]
@@ -23,7 +23,7 @@ to setup
   gis:draw roads-dataset 1
   set-default-shape nodes "circle"
 
-  set patchSize gis-patch-size
+  ;set patchSize gis-patch-size
 
   make-road-network
   add-agents
@@ -78,7 +78,7 @@ to make-road-network
 end
 
 to add-agents
-  create-pedestrians 5 [
+  create-pedestrians numberOfpedestrians [
     set color red
     set reached-destination false
     ; random spawn location
@@ -90,7 +90,7 @@ to add-agents
     set xcor item 0 location
     set ycor item 1 location
     ;; select nearest-node as starting point of agent for the network
-    let nearest-node min-one-of (nodes in-radius 0.01)[distance myself]
+    let nearest-node min-one-of (nodes in-radius 0.1)[distance myself]
     ;; temporary path variable
     let temp []
     ;; random target in radius at the moment , has to be modified to select based on attraction
@@ -145,9 +145,9 @@ to hide-nodes
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-210
+235
 10
-649
+674
 470
 16
 16
@@ -259,6 +259,21 @@ patchSiz
 17
 1
 11
+
+SLIDER
+10
+112
+225
+145
+NumberOfPedestrians
+NumberOfPedestrians
+1
+100
+100
+1
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
