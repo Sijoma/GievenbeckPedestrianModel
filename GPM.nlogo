@@ -3,7 +3,7 @@ globals [ roads-dataset patchSize]
 breed [ nodes node ]
 breed [ edges edge ]
 breed [ pedestrians pedestrian ]
-pedestrians-own [ destination ]
+pedestrians-own [ destination reached-destination blacklist]
 
 
 to setup
@@ -17,6 +17,7 @@ to setup
 
   gis:set-world-envelope (gis:envelope-of roads-dataset)
 
+  output-print gis:property-names roads-dataset
   ; draw data set
   gis:set-drawing-color blue
   gis:draw roads-dataset 1
@@ -79,6 +80,7 @@ end
 to add-agents
   create-pedestrians 5 [
     set color red
+    set reached-destination false
     ; random spawn location
     let feature one-of gis:feature-list-of roads-dataset
 
@@ -111,6 +113,17 @@ end
 to-report gis-patch-size ;; note: assume width & height same
   let world gis:world-envelope
   report (item 1 world - item 0 world) / (max-pxcor - min-pxcor)
+end
+
+to selectDestination
+  ;; get network within radius of current position of current agent
+  ;; find segment with maximum attractiveness with different id from previous destinations
+  ;; set destination to segment
+  ;; if no more possible nodes in radius call selectRandomDestination
+end
+
+to selectRandomDestination
+
 end
 
 to show-nodes
