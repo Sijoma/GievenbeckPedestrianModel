@@ -3,7 +3,7 @@ globals [ roads-dataset patchSize]
 breed [ nodes node ]
 breed [ edges edge ]
 breed [ pedestrians pedestrian ]
-pedestrians-own [ destination reached-destination blacklist]
+pedestrians-own [ destination reached-destination blacklist path]
 
 
 to setup
@@ -29,7 +29,7 @@ to setup
   add-agents
 
   ;; show path and destination and current positon
-  ask node 4 [ show nw:path-to node 25]
+  ;;ask node 4 [ show nw:path-to node 25]
   ask node 4 [ set color white ]
   ask node 25 [ set color red ]
   ask node 4 [   set size 1.55 ]
@@ -89,26 +89,40 @@ to add-agents
     ; set spawn position
     set xcor item 0 location
     set ycor item 1 location
-    ;;radius for selection of destination
-    let nearest-node min-one-of (nodes in-radius 1)[distance myself]
-    ;; node has attraction, select random node with attraction higher 0.5
-    ;;let destination min-one-of (nodes in-radius 30)[distance myself]
-    ;; path is the array with the links that connect the agents node to the destination
-    ;;set path ask node nearest-node [show nw:path-to node destination]
-    ;; implement function that iterates over the array and calls move to on the next link
-    set destination nearest-node
-    move-to destination
+    ;; select nearest-node as starting point of agent for the network
+    let nearest-node min-one-of (nodes in-radius 0.01)[distance myself]
+    ;; temporary path variable
+    let temp []
+    ;; random target in radius at the moment , has to be modified to select based on attraction
+    let target one-of (nodes in-radius 25)
+
+    ;; get the turtles from starting point to target set it as path
+    ask nearest-node [ set temp nw:turtles-on-path-to target ]
+    set path temp
+
+    ;; set the destination to the target
+    set destination target
   ]
 end
 
 to go
   ask pedestrians [
-    let new-location one-of [link-neighbors] of destination
-    move-to new-location
-    set destination new-location
+
+    ; if the pedestrian walked his path, generate new destination
+    ifelse empty? path
+      [ ]
+      [
+        ; set the nextStep as the first element of the path and move to it
+        let nextStep first path
+        move-To nextStep
+        ; remove first element of path
+        set path remove-item 0 path
+      ]
   ]
   tick
 end
+
+
 
 to-report gis-patch-size ;; note: assume width & height same
   let world gis:world-envelope
@@ -120,10 +134,6 @@ to selectDestination
   ;; find segment with maximum attractiveness with different id from previous destinations
   ;; set destination to segment
   ;; if no more possible nodes in radius call selectRandomDestination
-end
-
-to selectRandomDestination
-
 end
 
 to show-nodes
