@@ -3,7 +3,8 @@ globals [ roads-dataset ]
 breed [ nodes node ]
 breed [ edges edge ]
 breed [ pedestrians pedestrian ]
-pedestrians-own [ destination reached-destination blacklist path]
+pedestrians-own [ destination reached-destination blacklist path ]
+nodes-own [attractionNode accesses ]
 
 
 to setup
@@ -50,7 +51,7 @@ to make-road-network
         if not empty? location [ ; some coordinates are empty []
           create-nodes 1 [
             ;; all nodes have the attraction of the street segment they are on
-            let attractionNode attraction
+            set attractionNode attraction
             set color green
             set size 0.25
             set xcor item 0 location
@@ -89,20 +90,22 @@ to add-agents
     ; set spawn position
     set xcor item 0 location
     set ycor item 1 location
+
+    generateRoute
+
+  ]
+end
+
+to generateRoute
     ;; select nearest-node as starting point of agent for the network
     let nearest-node min-one-of (nodes in-radius 0.1)[distance myself]
     ;; temporary path variable
     let temp []
-    ;; random target in radius at the moment , has to be modified to select based on attraction
-    let target one-of (nodes in-radius 25)
-
+    set destination selectDestination
+    let target destination
     ;; get the turtles from starting point to target set it as path
     ask nearest-node [ set temp nw:turtles-on-path-to target ]
     set path temp
-
-    ;; set the destination to the target
-    set destination target
-  ]
 end
 
 to go
@@ -110,11 +113,12 @@ to go
 
     ; if the pedestrian walked his path, generate new destination
     ifelse empty? path
-      [ ]
+      [ generateRoute ]
       [
         ; set the nextStep as the first element of the path and move to it
         let nextStep first path
         move-To nextStep
+        ;set ([accesses] of nextStep) ([accesses] of nextStep + 1)
         ; remove first element of path
         set path remove-item 0 path
       ]
@@ -129,11 +133,10 @@ to-report gis-patch-size ;; note: assume width & height same
   report (item 1 world - item 0 world) / (max-pxcor - min-pxcor)
 end
 
-to selectDestination
-  ;; get network within radius of current position of current agent
-  ;; find segment with maximum attractiveness with different id from previous destinations
-  ;; set destination to segment
-  ;; if no more possible nodes in radius call selectRandomDestination
+to-report selectDestination
+  let subsetNetwork nodes in-radius 10
+  let sorted sort-on [( - attractionNode)] subsetNetwork
+  report first sorted
 end
 
 to show-nodes
@@ -269,7 +272,7 @@ NumberOfPedestrians
 NumberOfPedestrians
 1
 100
-100
+44
 1
 1
 NIL
