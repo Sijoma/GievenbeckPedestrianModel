@@ -1,13 +1,15 @@
 extensions [ gis nw ]
-globals [ roads-dataset ]
+globals [ roads-dataset localCount ]
 breed [ nodes node ]
 breed [ edges edge ]
 breed [ pedestrians pedestrian ]
-pedestrians-own [ destination reached-destination blacklist path ]
-nodes-own [attractionNode accesses ]
+pedestrians-own [ destination criteria reached-destination blacklist path]
+nodes-own [ attractionNode footprints identifier]
+links-own [ euclideanWeight topologicalWeight ]
 
 
 to setup
+
   ; reset
   clear-all
   reset-ticks
@@ -15,58 +17,56 @@ to setup
   ; load data set
   gis:load-coordinate-system (word "street_network.prj")
   set roads-dataset gis:load-dataset "street_network.shp"
-
   gis:set-world-envelope (gis:envelope-of roads-dataset)
 
-  output-print gis:property-names roads-dataset
   ; draw data set
   gis:set-drawing-color blue
   gis:draw roads-dataset 1
+
   set-default-shape nodes "circle"
+  set-default-shape pedestrians "circle"
 
   ;set patchSize gis-patch-size
 
   make-road-network
   add-agents
-
-  ;; show path and destination and current positon
-  ;;ask node 4 [ show nw:path-to node 25]
-  ask node 4 [ set color white ]
-  ask node 25 [ set color red ]
-  ask node 4 [   set size 1.55 ]
-  ask node 25 [  set size 1.55 ]
-
+  ask pedestrians [ set path(list) ]
 end
 
 to make-road-network
   clear-links
   let first-node nobody
   let previous-node nobody
-  foreach gis:feature-list-of roads-dataset [ ; each polyline
+
+  foreach gis:feature-list-of roads-dataset
+  [ ; each polyline
     ;; get attraction of street segment
     let attraction gis:property-value ? "ATTRACT"
-    foreach gis:vertex-lists-of ? [ ; each polyline segment / coordinate pair
-      foreach ? [ ; each coordinate
+    let id gis:property-value ? "ID_net"
+
+    foreach gis:vertex-lists-of ?
+    [ ; each polyline segment / coordinate pair
+      foreach ?
+      [ ; each coordinate
         let location gis:location-of ?
-        if not empty? location [ ; some coordinates are empty []
-          create-nodes 1 [
+
+        if not empty? location
+        [ ; some coordinates are empty []
+          create-nodes 1
+          [
             ;; all nodes have the attraction of the street segment they are on
             set attractionNode attraction
+            set identifier id
             set color green
             set size 0.25
             set xcor item 0 location
             set ycor item 1 location
             set hidden? true
-            let weight 0
 
-            if first-node = nobody [
-              set first-node self
-            ]
-            if previous-node != nobody [
-              ;let distanz distance previous-node
-              create-link-with previous-node [ set weight 1]
-
-            ]
+            if first-node = nobody
+             [ set first-node self ]
+            if previous-node != nobody
+             [ create-link-with previous-node ]
             set previous-node self
           ]
         ]
@@ -75,25 +75,75 @@ to make-road-network
     ]
   ]
   ; connect adjacent polylines/roads
-  ask nodes [ create-links-with other nodes in-radius 0.001 ]
+  ask nodes [ create-links-with other nodes in-radius 0.01]
+
+  ask links [set euclideanWeight link-length]
+  ask links [set topologicalWeight 1]
+  ask links [set color white]
+
 end
 
 to add-agents
-  create-pedestrians numberOfpedestrians [
-    set color red
+  create-pedestrians numberOfpedestrians
+  [
+    set size 0.45
     set reached-destination false
+
     ; random spawn location
     let feature one-of gis:feature-list-of roads-dataset
-
     let vertex one-of gis:vertex-lists-of feature
     let location gis:location-of (first vertex)
+
     ; set spawn position
     set xcor item 0 location
     set ycor item 1 location
 
-    generateRoute
-
+    let prob random-float 1
+    ifelse prob < 0.5
+     [ set color red
+       set criteria "euclidean"]
+     [ set color yellow + 1
+       set criteria "topological" ]
   ]
+
+end
+
+to go
+
+
+    ask pedestrians
+    [
+    ; if the pedestrian walked his path, generate new destination
+    ifelse empty? path
+      [ generateRoute ]
+      [; set the nextStep as the first element of the path and move to it
+        let nextStep first path
+        move-To nextStep
+        ;set ([accesses] of nextStep) ([accesses] of nextStep + 1)
+        ; remove first element of path
+        set path remove-item 0 path
+      ]
+    ]
+
+    if counting-footprints
+    [
+      ask nodes
+      [
+        let p patch-here
+
+        ask pedestrians
+        [ ifelse any? pedestrians-on p
+          [ set localCount count(pedestrians-on p) ]
+          [ set localCount 0]
+      ]
+      let old footprints
+      set footprints ( old + localCount )
+
+      ]
+
+    ]
+
+  tick
 end
 
 to generateRoute
@@ -104,28 +154,13 @@ to generateRoute
     set destination selectDestination
     let target destination
     ;; get the turtles from starting point to target set it as path
-    ask nearest-node [ set temp nw:turtles-on-path-to target ]
+
+    ifelse criteria = "euclidean"
+    [ ask nearest-node [ set temp nw:turtles-on-weighted-path-to target "euclideanWeight"]]
+    [ ask nearest-node [ set temp nw:turtles-on-weighted-path-to target "topologicalWeight"]]
+
     set path temp
 end
-
-to go
-  ask pedestrians [
-
-    ; if the pedestrian walked his path, generate new destination
-    ifelse empty? path
-      [ generateRoute ]
-      [
-        ; set the nextStep as the first element of the path and move to it
-        let nextStep first path
-        move-To nextStep
-        ;set ([accesses] of nextStep) ([accesses] of nextStep + 1)
-        ; remove first element of path
-        set path remove-item 0 path
-      ]
-  ]
-  tick
-end
-
 
 
 to-report gis-patch-size ;; note: assume width & height same
@@ -134,9 +169,21 @@ to-report gis-patch-size ;; note: assume width & height same
 end
 
 to-report selectDestination
-  let subsetNetwork nodes in-radius 10
+  let subsetNetwork nodes in-radius 5 ; about 600 meters
   let sorted sort-on [( - attractionNode)] subsetNetwork
-  report first sorted
+
+  ;output-print sorted
+  let prob random-float 1
+
+  ifelse prob < 0.6 ;50% of the times in the most attractive
+      [ report first sorted ]
+      [ ifelse prob < 0.8 ;20% of the times in the second most attractive
+        [ report item 1 sorted ]
+        [ ifelse prob < 0.9 ;10% of the times in the third most attractive
+          [ report item 2 sorted ]
+          [ let largeNetwork nodes
+            report one-of largeNetwork]]] ;20% in a random node in the the street network
+
 end
 
 to show-nodes
@@ -146,6 +193,8 @@ end
 to hide-nodes
   ask nodes [ set hidden? true ]
 end
+
+
 @#$#@#$#@
 GRAPHICS-WINDOW
 235
@@ -255,10 +304,10 @@ NIL
 MONITOR
 53
 386
-120
+142
 431
 NIL
-patchSiz
+gis-patch-size
 17
 1
 11
@@ -272,11 +321,22 @@ NumberOfPedestrians
 NumberOfPedestrians
 1
 100
-44
+200
 1
 1
 NIL
 HORIZONTAL
+
+SWITCH
+24
+189
+186
+222
+counting-footprints
+counting-footprints
+1
+1
+-1000
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -625,6 +685,21 @@ NetLogo 5.3.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
+<experiments>
+  <experiment name="countin" repetitions="1" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <timeLimit steps="1000"/>
+    <metric>[ identifier ] of nodes</metric>
+    <metric>[ footprints ] of nodes</metric>
+    <enumeratedValueSet variable="NumberOfPedestrians">
+      <value value="200"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="counting-footprints">
+      <value value="true"/>
+    </enumeratedValueSet>
+  </experiment>
+</experiments>
 @#$#@#$#@
 @#$#@#$#@
 default
